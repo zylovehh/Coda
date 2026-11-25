@@ -138,8 +138,10 @@ enum CodaBuiltinThemes {
 
 /// 主题选择存在 UserDefaults 里；单例，各页直接用。Coda 自己的红是默认主题，
 /// 换主题后整个 App 的强调色、背景、卡片都跟着变；播放页另有封面变色盖在上面。
-final class CodaThemeManager: ObservableObject {
-    static let shared = CodaThemeManager()
+/// 公开是因为 iOS 应用入口（CodaIOSApp.swift，在 CodaCore 模块外面）也要拿它：
+/// 换主题时整棵视图树跟着刷新。其他成员保持 internal，只把外面用到的公开。
+public final class CodaThemeManager: ObservableObject {
+    public static let shared = CodaThemeManager()
 
     enum ID: String, CaseIterable {
         case `default` = "default"
@@ -218,7 +220,8 @@ final class CodaThemeManager: ObservableObject {
     }
 
     /// 当前系统深浅下的强调色（静态 Theme.accent 走这里）。
-    var accent: Color {
+    /// 公开：iOS 应用入口拿它当整棵视图树的 tint。
+    public var accent: Color {
         colors(for: effectiveScheme).accent
     }
 
