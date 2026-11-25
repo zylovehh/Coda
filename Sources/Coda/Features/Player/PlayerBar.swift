@@ -470,21 +470,21 @@ struct PlayerTransportControls: View {
             PlayerTransportButton(
                 icon: player.isFMMode ? "trash" : orderIcon,
                 label: player.isFMMode ? "不喜欢" : "随机播放",
-                size: 17 * glyphScale, width: width / 5, height: height, tint: tint,
+                size: 17 * glyphScale, width: width / 5, tint: tint, height: height,
                 active: !player.isFMMode && orderActive
             ) {
                 if player.isFMMode { player.fmTrash() } else { cycleOrder() }
             }
             PlayerTransportButton(icon: "backward.fill", label: "上一首", size: 28 * glyphScale,
-                                  width: width / 5, height: height, tint: tint, disabled: player.isFMMode, action: player.previous)
+                                  width: width / 5, tint: tint, height: height, disabled: player.isFMMode, action: player.previous)
             PlayerPlayPauseButton(isPlaying: player.isPlaying, isLoading: player.showsPlaybackLoading,
-                                  size: 40 * glyphScale, width: width / 5, height: height, tint: tint,
+                                  size: 40 * glyphScale, width: width / 5, tint: tint, height: height,
                                   action: player.togglePlayPause)
                 .accessibilityIdentifier("iPadPlayPauseButton")
             PlayerTransportButton(icon: "forward.fill", label: "下一首", size: 28 * glyphScale,
-                                  width: width / 5, height: height, tint: tint, action: player.next)
+                                  width: width / 5, tint: tint, height: height, action: player.next)
             PlayerTransportButton(icon: player.repeatMode == .one ? "repeat.1" : "repeat",
-                                  label: "循环模式", size: 17 * glyphScale, width: width / 5, height: height, tint: tint,
+                                  label: "循环模式", size: 17 * glyphScale, width: width / 5, tint: tint, height: height,
                                   active: player.repeatMode != .off, disabled: player.isFMMode,
                                   action: player.cycleRepeatMode)
         }

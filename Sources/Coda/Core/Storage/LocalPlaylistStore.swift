@@ -20,7 +20,7 @@ struct LocalPlaylist: Codable, Identifiable, Hashable {
 
     /// How many of this playlist's songs came from each platform.
     var countsByProvider: [MusicProvider: Int] {
-        Dictionary(grouping: tracks, by: { $0.platformSong?.source ?? .netease }).mapValues(\.count)
+        Dictionary(grouping: tracks, by: { MusicProvider(rawValue: $0.platformSong?.source.rawValue ?? "netease") ?? .netease }).mapValues(\.count)
     }
 }
 

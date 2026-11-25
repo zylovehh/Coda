@@ -215,7 +215,7 @@ final class AppleMusicPlaylistImporter: ObservableObject {
         }
         guard !matched.isEmpty else { throw AppleMusicPlaylistImportError.nothingMatched(playlist.songs.count) }
         let tracks = matched.map(\.track)
-        let counts = Dictionary(grouping: tracks, by: { $0.platformSong?.source ?? .netease }).mapValues(\.count)
+        let counts = Dictionary(grouping: tracks, by: { MusicProvider(rawValue: $0.platformSong?.source.rawValue ?? "netease") ?? .netease }).mapValues(\.count)
         LocalPlaylistStore.shared.upsert(name: Self.playlistName, tracks: tracks)
         return Outcome(playlistTitle: playlist.title, preferredProvider: preferredProvider,
                        countsByProvider: counts, imported: matched.count, missing: missing)
