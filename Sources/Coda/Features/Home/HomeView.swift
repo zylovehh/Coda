@@ -773,10 +773,17 @@ struct CoverCardBody: View {
 
     @State private var isHovering = false
     @Environment(\.flexibleCardWidth) private var flexibleWidth
+    /// 彩色卡片开关（主题设置里开）：没封面的卡片垫一层主题渐变。
+    @ObservedObject private var theme = CodaThemeManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.small) {
             artwork
+                .background {
+                    if theme.colorfulCards && theme.themeID != .default {
+                        theme.cardGradient(forItemID: title)
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

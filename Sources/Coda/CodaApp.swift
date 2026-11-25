@@ -10,6 +10,8 @@ public struct CodaApp: App {
     @StateObject private var settings = SettingsManager.shared
     @StateObject private var toasts = ToastCenter.shared
     @StateObject private var shortcuts = ShortcutManager.shared
+    /// 主题单例放这里观察：换主题时整棵视图树跟着刷新，强调色和背景都变。
+    @StateObject private var theme = CodaThemeManager.shared
     @Environment(\.openWindow) private var openWindow
 
     public init() {}
@@ -21,7 +23,8 @@ public struct CodaApp: App {
                 .environmentObject(account)
                 .environmentObject(settings)
                 .environmentObject(toasts)
-                .tint(Theme.accent)
+                .environmentObject(theme)
+                .tint(theme.accent)
                 .preferredColorScheme(settings.appearance.colorScheme)
                 .frame(minWidth: WindowLayout.minimumWidth,
                        minHeight: Theme.Layout.minWindowHeight)

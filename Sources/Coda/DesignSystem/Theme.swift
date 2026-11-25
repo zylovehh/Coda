@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Design tokens: color, radius, spacing, layout metrics.
 enum Theme {
-    /// NetEase red, tuned slightly warmer for macOS.
-    static let accent = Color(red: 0.925, green: 0.286, blue: 0.286) // #EC4949
-    static let accentDeep = Color(red: 0.788, green: 0.161, blue: 0.161) // #C92929
+    /// App 强调色，跟着当前主题走（默认是网易云红 #EC4949；见 CodaThemeManager）。
+    static var accent: Color { CodaThemeManager.shared.accent }
+    static var accentDeep: Color { CodaThemeManager.shared.accentDeep }
 
     /// Shared translucent surface for the iPad navigation and playback bars.
     static let barMaterial: Material = .regular
@@ -32,10 +32,12 @@ enum Theme {
         static let cover = Color(red: 0.43, green: 0.43, blue: 0.45)
     }
 
-    static let accentGradient = LinearGradient(
-        colors: [Color(red: 0.973, green: 0.357, blue: 0.357), accentDeep],
-        startPoint: .topLeading, endPoint: .bottomTrailing
-    )
+    static var accentGradient: LinearGradient {
+        LinearGradient(
+            colors: [accent.codaBlended(toward: .white, amount: 0.08), accentDeep],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
+    }
 
     enum Radius {
         static let badge: CGFloat = 4

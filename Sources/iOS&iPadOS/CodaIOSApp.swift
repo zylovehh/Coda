@@ -4,9 +4,13 @@ import CodaCore
 @main
 struct CodaIOSApp: App {
     @UIApplicationDelegateAdaptor(DownloadAppDelegate.self) private var downloadDelegate
+    /// 主题单例放这里观察：换主题时整棵视图树跟着刷新，强调色和背景都变。
+    @StateObject private var theme = CodaThemeManager.shared
     var body: some Scene {
         WindowGroup {
             IOSMainWindow()
+                .environmentObject(theme)
+                .tint(theme.accent)
         }
     }
 }

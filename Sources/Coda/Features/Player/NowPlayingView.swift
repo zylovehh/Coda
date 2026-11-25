@@ -52,6 +52,8 @@ struct NowPlayingView: View {
     #endif
 
     @Environment(\.accessibilityReduceMotion) private var reducePlayerMotion
+    /// 封面变色的脉动（跟着音频低频走；关了封面变色也不用它）。
+    @StateObject private var coverPulse = CoverPulseModel()
     @ScaledMetric(relativeTo: .title3) private var iPadMetadataHeight: CGFloat = 56
     #if os(iOS)
     // Restore the last explicit lyric/artwork choice across presentations and launches.
@@ -196,10 +198,24 @@ struct NowPlayingView: View {
         #endif
     }
 
+    /// 播放页强调色：开着封面变色且有封面时用封面主色（跟着脉动微亮），
+    /// 否则用 WQ 主题的强调色。
+    private var playerAccent: Color {
+        CoverReactiveAccent.color(colors: colors, enabled: settings.coverReactiveColors,
+                                  pulse: coverPulse.pulse)
+    }
+
     private var backdrop: some View {
-        NowPlayingFluidBackground(artwork: artworkImage, artworkKey: player.currentTrack?.album.picUrl,
-                                  colors: colors, playing: player.isPlaying)
-            .environment(\.colorScheme, backgroundColorScheme)
+        Group {
+            if settings.coverReactiveColors {
+                NowPlayingFluidBackground(artwork: artworkImage, artworkKey: player.currentTrack?.album.picUrl,
+                                          colors: colors, playing: player.isPlaying)
+            } else {
+                // 关了封面变色：播放页用 WQ 主题的背景。
+                CodaThemeBackgroundView()
+            }
+        }
+        .environment(\.colorScheme, backgroundColorScheme)
     }
 
     #if os(iOS)
@@ -253,11 +269,11 @@ struct NowPlayingView: View {
         return VStack(spacing: 0) {
             controlLayer(animated: animated, offset: 180, showDelay: 0.025, hideDelay: 0.075) {
                 NowPlayingScrubber(showsRemainingTime: true, rowHeight: metrics.progressHeight,
-                                   trackHeight: metrics.trackHeight)
+                                   trackHeight: metrics.trackHeight, tint: playerAccent)
             }
             Color.clear.frame(height: metrics.progressGap)
             controlLayer(animated: animated, offset: 165, showDelay: 0.05, hideDelay: 0.05) {
-                PlayerTransportControls(width: width, height: metrics.transportHeight)
+                PlayerTransportControls(width: width, height: metrics.transportHeight, tint: playerAccent)
             }
             Color.clear.frame(height: metrics.transportGap)
             controlLayer(animated: animated, offset: 148, showDelay: 0.075, hideDelay: 0.025) {
@@ -1079,9 +1095,9 @@ struct NowPlayingView: View {
                     .frame(height: iPadMetadataHeight)
                     .padding(.bottom, spacing.metadata)
                 NowPlayingScrubber(showsRemainingTime: true, rowHeight: metrics.progressHeight,
-                                   trackHeight: metrics.trackHeight)
+                                   trackHeight: metrics.trackHeight, tint: playerAccent)
                     .padding(.bottom, spacing.progress)
-                PlayerTransportControls(width: controlsWidth, height: transportHeight)
+                PlayerTransportControls(width: controlsWidth, height: transportHeight, tint: playerAccent)
                     .padding(.bottom, spacing.transport)
                 volumeControl(rowHeight: metrics.volumeHeight, trackHeight: metrics.trackHeight)
             }
@@ -1147,9 +1163,9 @@ struct NowPlayingView: View {
                                        onAddToPlaylist: togglePlaylistPanel)
             }
             NowPlayingScrubber(showsRemainingTime: true, rowHeight: metrics.progressHeight,
-                               trackHeight: metrics.trackHeight)
+                               trackHeight: metrics.trackHeight, tint: playerAccent)
                 .frame(width: width)
-            PlayerTransportControls(width: width)
+            PlayerTransportControls(width: width, tint: playerAccent)
             volumeControl(rowHeight: metrics.volumeHeight, trackHeight: metrics.trackHeight)
             HStack {
                 CurrentPlaybackDeviceButton(showsName: false)

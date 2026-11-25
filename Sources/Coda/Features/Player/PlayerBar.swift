@@ -436,6 +436,8 @@ struct PlayerTransportControls: View {
     @EnvironmentObject private var player: PlayerService
     let width: CGFloat
     var height: CGFloat = 64
+    /// 按钮颜色；默认白色（悬浮播放条）。播放页传封面主色进来。
+    var tint: Color = PlayerControlAppearance.tint
 
     private var glyphScale: CGFloat { min(1, width / 280) }
 
@@ -468,21 +470,21 @@ struct PlayerTransportControls: View {
             PlayerTransportButton(
                 icon: player.isFMMode ? "trash" : orderIcon,
                 label: player.isFMMode ? "不喜欢" : "随机播放",
-                size: 17 * glyphScale, width: width / 5, height: height,
+                size: 17 * glyphScale, width: width / 5, height: height, tint: tint,
                 active: !player.isFMMode && orderActive
             ) {
                 if player.isFMMode { player.fmTrash() } else { cycleOrder() }
             }
             PlayerTransportButton(icon: "backward.fill", label: "上一首", size: 28 * glyphScale,
-                                  width: width / 5, height: height, disabled: player.isFMMode, action: player.previous)
+                                  width: width / 5, height: height, tint: tint, disabled: player.isFMMode, action: player.previous)
             PlayerPlayPauseButton(isPlaying: player.isPlaying, isLoading: player.showsPlaybackLoading,
-                                  size: 40 * glyphScale, width: width / 5, height: height,
+                                  size: 40 * glyphScale, width: width / 5, height: height, tint: tint,
                                   action: player.togglePlayPause)
                 .accessibilityIdentifier("iPadPlayPauseButton")
             PlayerTransportButton(icon: "forward.fill", label: "下一首", size: 28 * glyphScale,
-                                  width: width / 5, height: height, action: player.next)
+                                  width: width / 5, height: height, tint: tint, action: player.next)
             PlayerTransportButton(icon: player.repeatMode == .one ? "repeat.1" : "repeat",
-                                  label: "循环模式", size: 17 * glyphScale, width: width / 5, height: height,
+                                  label: "循环模式", size: 17 * glyphScale, width: width / 5, height: height, tint: tint,
                                   active: player.repeatMode != .off, disabled: player.isFMMode,
                                   action: player.cycleRepeatMode)
         }

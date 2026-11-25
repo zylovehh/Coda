@@ -6,6 +6,7 @@ struct SettingsView: View {
     @StateObject private var accountsPresentation = MusicAccountsPresentation()
     @Environment(\.openDestination) private var openDestination
     @StateObject private var storageModel = StorageSpaceModel()
+    @ObservedObject private var theme = CodaThemeManager.shared
     @State private var pendingStorageDeletion: StorageItem?
     @State private var automaticCacheLimitMB: Int?
     @State private var showsDisclaimer = false
@@ -55,6 +56,28 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 #endif
+
+                Section("主题") {
+                    NavigationLink {
+                        CodaThemeSettingsView()
+                    } label: {
+                        HStack {
+                            Label("主题", systemImage: "paintpalette")
+                            Spacer()
+                            Text(theme.themeID.displayName)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .pageFormNavigationRow()
+                    Toggle(isOn: $settings.coverReactiveColors) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("播放页跟随封面变色")
+                            Text("打开后播放页的背景和强调色跟着当前歌曲封面走，关了就用主题的颜色")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
 
                 // On iPhone the sheet's openDestination closes settings first.
                 StorageSpaceSections(model: storageModel, pendingDeletion: $pendingStorageDeletion,

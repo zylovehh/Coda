@@ -163,8 +163,12 @@ struct MainWindow: View {
         #endif
         #if os(iOS)
         .backgroundPreferenceValue(AppPageBackgroundKey.self) { color in
-            (color ?? Theme.LikedMusic.background(colorScheme))
-                .ignoresSafeArea(.container)
+            // 有页面自带背景时用页面的；没有就用当前主题的背景。
+            if let color {
+                color.ignoresSafeArea(.container)
+            } else {
+                CodaThemeBackgroundView()
+            }
         }
         #endif
         .coordinateSpace(name: "mainWindow")
@@ -412,7 +416,7 @@ struct MainWindow: View {
                     .padding(.top, DesktopChromeLayout.topInset)
                     .padding(.bottom, SidebarLayout.outerInset)
             }
-            .background(Theme.LikedMusic.background(colorScheme))
+            .background(CodaThemeBackgroundView())
             .onAppear { mainColumnGeometry.update(layout) }
             .onChange(of: layout) { mainColumnGeometry.update($0) }
         }
@@ -461,7 +465,7 @@ struct MainWindow: View {
                 IPadMainColumnPlayerBar(geometry: mainColumnGeometry)
                     .padding(.bottom, legacySystemInsets.bottom + legacyKeyboardOverlap)
             }
-            .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+            .background(CodaThemeBackgroundView())
             .onAppear { mainColumnGeometry.update(layout) }
             .onChange(of: layout) { next in
                 if scenePhase == .active { mainColumnGeometry.update(next) }

@@ -110,6 +110,7 @@ final class SettingsManager: ObservableObject {
         static let desktopLyricsCentered = "settings.desktopLyricsCentered"
         static let mainWindowAmbientBackground = "settings.showMainWindowAmbientBackground"
         static let mainWindowAmbientBackgroundIntensity = "settings.mainWindowAmbientBackgroundIntensity"
+        static let coverReactiveColors = "settings.coverReactiveColors"
         static let enableAudioCache = "settings.enableAudioCache"
         static let audioCacheSizeMB = "settings.audioCacheSizeMB"
         static let audioCacheAutomatic = "settings.audioCacheAutomatic"
@@ -278,6 +279,11 @@ final class SettingsManager: ObservableObject {
             )
         }
     }
+
+    /// 播放页是否跟随封面变色。关了播放页就用 WQ 主题的颜色。
+    @Published var coverReactiveColors: Bool {
+        didSet { UserDefaults.standard.set(coverReactiveColors, forKey: Keys.coverReactiveColors) }
+    }
     private init() {
         let defaults = UserDefaults.standard
         audioQuality = defaults.string(forKey: Keys.quality).flatMap(AudioQuality.init) ?? .exhigh
@@ -325,5 +331,6 @@ final class SettingsManager: ObservableObject {
             max(storedAmbientBackgroundIntensity, Self.mainWindowAmbientBackgroundIntensityRange.lowerBound),
             Self.mainWindowAmbientBackgroundIntensityRange.upperBound
         )
+        coverReactiveColors = defaults.object(forKey: Keys.coverReactiveColors) as? Bool ?? true
     }
 }
