@@ -17,6 +17,7 @@ struct SidebarView: View {
     @ScaledMetric(relativeTo: .headline) private var identityTextSize: CGFloat = 14
     @ScaledMetric(relativeTo: .title2) private var sectionTextSize: CGFloat = 20
     @State private var showNewPlaylist = false
+    @State private var showAppleImport = false
     @State private var newPlaylistName = ""
     @State private var showAccountSwitcher = false
     @State private var isHoveringIdentity = false
@@ -85,6 +86,17 @@ struct SidebarView: View {
                             .foregroundStyle(.secondary)
                             .accessibilityLabel("新建歌单")
                             .disabled(!account.provider.supports(.playlistCreation))
+                            Button {
+                                showAppleImport = true
+                            } label: {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .frame(width: SidebarLayout.hitSize, height: SidebarLayout.hitSize)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("导入 Apple Music 歌单")
                         }
                     }
                     .modifier(PlaylistEditAnimation(ids: account.createdPlaylists.map(\.id), owner: libraryOwner))
@@ -159,6 +171,10 @@ struct SidebarView: View {
                 }
             }
             Button("取消", role: .cancel) { newPlaylistName = "" }
+        }
+        .sheet(isPresented: $showAppleImport) {
+            AppleMusicImportSheet()
+                .environmentObject(account)
         }
     }
 

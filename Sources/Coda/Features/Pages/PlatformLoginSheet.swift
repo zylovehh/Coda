@@ -7,13 +7,31 @@ struct PlatformLoginSheet: View {
     var addsAccount = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var account: AccountStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var image: PlatformImage?
     @State private var qqChannel = QQMusicLoginChannel.qq
     @State private var status = "正在获取二维码…"
-    @State private var refresh = UUID()
     @State private var isSaving = false
     @StateObject private var qishuiAuth = QishuiMusicAPI(diagnostics: true)
     @StateObject private var qqAuth = QQMusicAuth(persistsSession: false)
+    /// The running login task, so returning from the music app can tell whether
+    /// polling is still alive. A single failed poll must not end the login:
+    /// the request in flight when the user leaves to scan is routinely cut off.
+    @State private var loginTask: Task<Void, Never>?
+    /// The QR session being polled, kept so polling can resume with the same
+    /// code instead of showing a dead screen or a fresh code.
+    @State private var kugouKey = ""
+    @State private var qishuiToken = ""
+    /// Consecutive poll failures tolerated before giving up (about 18 seconds).
+    private static let maxConsecutivePollErrors = 6
+
+    private enum PollOutcome {
+        case waiting(String)
+        case scanned(String)
+        case expired
+        case failed(String)
+        case success([String: String], String)
+    }
 
     var body: some View {
         VStack(spacing: Theme.Spacing.section) {
@@ -26,13 +44,13 @@ struct PlatformLoginSheet: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 .disabled(isSaving)
-                .onChange(of: qqChannel) { _ in refresh = UUID() }
+                .onChange(of: qqChannel) { _ in startLogin() }
             }
             Text(provider == .qishui ? "请使用已登录的汽水音乐 App 扫码并确认登录" : provider == .qq ? "请使用\(qqChannel.name)扫描二维码并确认登录" : "请使用酷狗音乐扫描二维码并确认登录")
                 .font(Theme.Typography.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
             LoginQRCodeFrame(image: image) { EmptyView() }
             Text(status).font(Theme.Typography.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button("刷新二维码") { refresh = UUID() }
+            Button("刷新二维码") { startLogin() }
                 .buttonStyle(.plain).font(Theme.Typography.caption).foregroundStyle(Theme.accent)
                 .disabled(isSaving)
             Button("取消") { dismiss() }
@@ -41,19 +59,51 @@ struct PlatformLoginSheet: View {
         }
         .frame(width: 320)
         .interactiveDismissDisabled(isSaving)
-        .task(id: refresh) { await login() }
-        .onDisappear { if provider == .qishui { qishuiAuth.cancelLogin() } }
+        .onAppear { startLogin() }
+        .onDisappear {
+            loginTask?.cancel()
+            if provider == .qishui { qishuiAuth.cancelLogin() }
+        }
+        // Coming back from the music app: if polling died while the app was in
+        // the background, pick it up with the same QR code the user scanned.
+        .onChange(of: scenePhase) { _ in
+            guard scenePhase == .active, !isSaving, image != nil,
+                  loginTask == nil || loginTask?.isCancelled == true else { return }
+            if provider == .qishui || provider == .kugou || (provider == .qq && qqChannel == .qq) {
+                loginTask = Task { await pollLoop() }
+            } else {
+                startLogin()
+            }
+        }
         .sheet(isPresented: Binding(get: { qishuiAuth.verificationWebView != nil }, set: { if !$0 { qishuiAuth.cancelVerification() } })) {
             if let web = qishuiAuth.verificationWebView {
                 QishuiSecurityVerificationView(webView: web, onCancel: { qishuiAuth.cancelVerification() })
             }
         }
     }
-    private func login() async {
+
+    /// Starts a fresh QR code (used on appear, on refresh and on channel switch).
+    private func startLogin() {
+        loginTask?.cancel()
+        kugouKey = ""
+        qishuiToken = ""
+        loginTask = Task { await runLogin() }
+    }
+
+    private func runLogin() async {
         image = nil
         status = "正在获取二维码…"
         do {
-            if provider == .qishui { try await loginQishui(); return }
+            if provider == .qishui {
+                let qr = try await qishuiAuth.qrCode()
+                try Task.checkCancellation()
+                qishuiToken = qr.token
+                guard let decoded = Self.qrImage(qr.scanURL.absoluteString) else { throw QishuiError.invalidResponse }
+                image = decoded
+                status = "等待使用汽水音乐扫码"
+                await pollLoop()
+                return
+            }
             if provider == .qq, qqChannel != .qq {
                 let channel = qqChannel
                 let result = try await QQMusicAdditionalLogin.signIn(channel, onImage: { data in
@@ -66,7 +116,6 @@ struct PlatformLoginSheet: View {
                 await finish(credentials: result.credentials, nickname: result.nickname)
                 return
             }
-            var key = ""
             if provider == .qq {
                 let data = try await qqAuth.fetchQRCode()
                 try Task.checkCancellation()
@@ -74,59 +123,78 @@ struct PlatformLoginSheet: View {
             } else {
                 let qr = try await KugouMusicAPI.shared.qrKey()
                 try Task.checkCancellation()
-                key = qr.key
+                kugouKey = qr.key
                 image = Self.qrImage(qr.url)
             }
             status = "等待扫码"
-            while !Task.isCancelled {
-                try await Task.sleep(for: .seconds(3))
-                if provider == .qq {
-                    let state = try await qqAuth.poll()
-                    try Task.checkCancellation()
-                    switch state {
-                    case .waiting: status = "等待扫码"
-                    case .scanned: status = "已扫码，请在 QQ 中确认"
-                    case .expired: status = "二维码已过期，请刷新"; return
-                    case .error(let message): status = message; return
-                    case .success(let nickname): await finish(credentials: qqAuth.exportedCredentials, nickname: nickname); return
-                    }
-                } else {
-                    let state = try await KugouMusicAPI.shared.pollQR(key: key)
-                    try Task.checkCancellation()
-                    switch state {
-                    case .waiting: status = "等待扫码"
-                    case .scanned: status = "已扫码，请在酷狗音乐中确认"
-                    case .expired: status = "二维码已过期，请刷新"; return
-                    case .error(let message): status = message; return
-                    case .success(let credentials): await finish(credentials: credentials, nickname: credentials["nickname"] ?? "酷狗音乐用户"); return
-                    }
-                }
-            }
+            await pollLoop()
         } catch is CancellationError { return }
         catch { if !Task.isCancelled { status = error.localizedDescription } }
     }
-    private func loginQishui() async throws {
-        let qr = try await qishuiAuth.qrCode()
-        try Task.checkCancellation()
-        guard let decoded = Self.qrImage(qr.scanURL.absoluteString) else { throw QishuiError.invalidResponse }
-        image = decoded
-        status = "等待使用汽水音乐扫码"
+
+    /// Polls the QR state until it succeeds, expires or fails for good.
+    /// Transient failures (the usual one is the request cut off when the app
+    /// goes to the background while the user scans) are retried instead of
+    /// leaving the login stuck on the QR screen.
+    private func pollLoop() async {
+        var consecutiveErrors = 0
         while !Task.isCancelled {
-            try await Task.sleep(for: .seconds(3))
-            if qishuiAuth.isQRCodeExpired(token: qr.token) { status = "二维码已过期，请刷新"; return }
-            let state = try await qishuiAuth.pollQRCode(token: qr.token)
-            try Task.checkCancellation()
-            switch state {
-            case .waiting: status = "等待使用汽水音乐扫码"
-            case .scanned: status = "已扫码，请在汽水音乐中确认"
-            case .processing: status = "正在等待平台完成登录，请稍候…"
-            case .expired: status = "二维码已过期，请刷新"; return
-            case .confirmed(let credentials):
-                await finish(credentials: credentials, nickname: credentials["nickname"] ?? "汽水音乐用户")
-                return
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            if Task.isCancelled { return }
+            do {
+                let outcome = try await pollOnce()
+                consecutiveErrors = 0
+                switch outcome {
+                case .waiting(let text): status = text
+                case .scanned(let text): status = text
+                case .expired: status = "二维码已过期，请刷新"; return
+                case .failed(let message): status = message; return
+                case .success(let credentials, let nickname):
+                    await finish(credentials: credentials, nickname: nickname)
+                    return
+                }
+            } catch is CancellationError { return }
+            catch {
+                consecutiveErrors += 1
+                if consecutiveErrors >= Self.maxConsecutivePollErrors {
+                    status = error.localizedDescription
+                    return
+                }
             }
         }
     }
+
+    /// One poll round against the QR code fetched by runLogin.
+    private func pollOnce() async throws -> PollOutcome {
+        if provider == .qishui {
+            if qishuiAuth.isQRCodeExpired(token: qishuiToken) { return .expired }
+            switch try await qishuiAuth.pollQRCode(token: qishuiToken) {
+            case .waiting: return .waiting("等待使用汽水音乐扫码")
+            case .scanned: return .scanned("已扫码，请在汽水音乐中确认")
+            case .processing: return .waiting("正在等待平台完成登录，请稍候…")
+            case .expired: return .expired
+            case .confirmed(let credentials):
+                return .success(credentials, credentials["nickname"] ?? "汽水音乐用户")
+            }
+        }
+        if provider == .qq {
+            switch try await qqAuth.poll() {
+            case .waiting: return .waiting("等待扫码")
+            case .scanned: return .scanned("已扫码，请在 QQ 中确认")
+            case .expired: return .expired
+            case .error(let message): return .failed(message)
+            case .success(let nickname): return .success(qqAuth.exportedCredentials, nickname)
+            }
+        }
+        switch try await KugouMusicAPI.shared.pollQR(key: kugouKey) {
+        case .waiting: return .waiting("等待扫码")
+        case .scanned: return .scanned("已扫码，请在酷狗音乐中确认")
+        case .expired: return .expired
+        case .error(let message): return .failed(message)
+        case .success(let credentials): return .success(credentials, credentials["nickname"] ?? "酷狗音乐用户")
+        }
+    }
+
     private func finish(credentials: [String: String], nickname: String) async {
         isSaving = true
         defer { isSaving = false }

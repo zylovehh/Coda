@@ -8,6 +8,7 @@ struct LibraryView: View {
     @EnvironmentObject private var account: AccountStore
     @State private var showSettings = false
     @State private var showNewPlaylist = false
+    @State private var showAppleImport = false
     @State private var newPlaylistName = ""
     @StateObject private var profileDetail = PanelResource<NeteaseAPI.UserDetailResponse?>(nil)
 
@@ -90,6 +91,10 @@ struct LibraryView: View {
             }
             Button("取消", role: .cancel) { newPlaylistName = "" }
         }
+        .sheet(isPresented: $showAppleImport) {
+            AppleMusicImportSheet()
+                .environmentObject(account)
+        }
     }
 
     private var phonePage: some View {
@@ -131,6 +136,13 @@ struct LibraryView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("新建歌单")
                     .disabled(!account.provider.supports(.playlistCreation))
+                    Button { showAppleImport = true } label: {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("导入 Apple Music 歌单")
                 }
                 .padding(.horizontal, 16)
                 playlistShelf(phoneCreatedPlaylists)
@@ -296,6 +308,13 @@ struct LibraryView: View {
                             }
                             .accessibilityLabel("新建歌单")
                             .disabled(!account.provider.supports(.playlistCreation))
+                            Button {
+                                showAppleImport = true
+                            } label: {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .accessibilityLabel("导入 Apple Music 歌单")
                         }
                     }
                 }
