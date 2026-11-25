@@ -1466,20 +1466,28 @@ final class PlayerService: ObservableObject {
         if let urlString = data?.url {
             url = track.playbackURL(urlString)
         }
-        // The platform refused the song or offers only a preview: look for
-        // the same recording elsewhere.
+        // The platform refused the song or offers only a preview: a track
+        // that came from another platform first tries its own platform, so
+        // a mixed playlist plays without switching the current platform;
+        // only then look for the same recording elsewhere.
         if url == nil || data?.freeTrialInfo != nil {
-            let resolution = await UnblockResolver.resolve(
-                track,
-                quality: settings.preferredPlaybackQuality,
-                excluding: excludedSources,
-                purpose: purpose
-            )
-            attempted = resolution.attemptedSources
-            if let unblocked = resolution.source {
-                url = unblocked.url
-                unblock = unblocked
+            if let own = await ownPlatformURLString(for: track, quality: quality),
+               let ownURL = track.playbackURL(own) {
+                url = ownURL
                 data = nil
+            } else {
+                let resolution = await UnblockResolver.resolve(
+                    track,
+                    quality: settings.preferredPlaybackQuality,
+                    excluding: excludedSources,
+                    purpose: purpose
+                )
+                attempted = resolution.attemptedSources
+                if let unblocked = resolution.source {
+                    url = unblocked.url
+                    unblock = unblocked
+                    data = nil
+                }
             }
         }
         guard let url else { return nil }
@@ -1496,6 +1504,32 @@ final class PlayerService: ObservableObject {
             attemptedUnblockSources: attempted,
             isTrial: data?.freeTrialInfo != nil,
             durationMS: data?.time)
+    }
+
+    /// The stream address for a track from its own platform (QQ or Kugou),
+    /// used when the current platform cannot serve it — a mixed playlist
+    /// plays each song from where it was found. Returns nil for NetEase
+    /// tracks and for Qishui, which already has its own branch above.
+    private func ownPlatformURLString(for track: Track, quality: String) async -> String? {
+        guard let song = track.platformSong else { return nil }
+        let level = ProviderAudioQuality(rawValue: quality) ?? .hires
+        switch song.source {
+        case .qq:
+            guard let mid = song.qqMid else { return nil }
+            do {
+                return try await QQMusicAPI.shared.songURL(songmid: mid, mediaMid: song.qqMediaMid, quality: level)
+            } catch {
+                return nil
+            }
+        case .kugou:
+            do {
+                return try await KugouMusicAPI.shared.songURL(song: song, quality: level)
+            } catch {
+                return nil
+            }
+        case .qishui, .netease:
+            return nil
+        }
     }
 
     private func resolveAndLoad(_ track: Track, generation: Int,

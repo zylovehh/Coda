@@ -970,6 +970,9 @@ struct SidebarDestinationView: View {
         case .playlist(let id):
             PlaylistDetailView(playlistID: id, onDeleted: onPlaylistDeleted)
                 .id(id)
+        case .localPlaylist(let id):
+            LocalPlaylistDetailView(playlistID: id)
+                .id(id)
         }
     }
 

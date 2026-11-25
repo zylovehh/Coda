@@ -21,6 +21,7 @@ struct SidebarView: View {
     @State private var newPlaylistName = ""
     @State private var showAccountSwitcher = false
     @State private var isHoveringIdentity = false
+    @StateObject private var localPlaylists = LocalPlaylistStore.shared
     @State private var gearTurns: Double = 0
     @Namespace private var selectionHighlight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -100,6 +101,16 @@ struct SidebarView: View {
                         }
                     }
                     .modifier(PlaylistEditAnimation(ids: account.createdPlaylists.map(\.id), owner: libraryOwner))
+                }
+
+                if !localPlaylists.playlists.isEmpty {
+                    SidebarSection {
+                        ForEach(localPlaylists.playlists) { playlist in
+                            localPlaylistRow(playlist).transition(playlistTransition)
+                        }
+                    } header: {
+                        sectionTitle("本地歌单")
+                    }
                 }
 
                 if !account.subscribedPlaylists.isEmpty {
@@ -452,6 +463,30 @@ struct SidebarView: View {
                         } catch { ToastCenter.shared.show("取消收藏失败：\(error.localizedDescription)") }
                     }
                 }
+            }
+        }
+    }
+
+    /// A local playlist (imported Apple Music playlist): its tracks can mix
+    /// platforms, so the row uses the first track's cover and a play action
+    /// that plays the saved tracks directly.
+    private func localPlaylistRow(_ playlist: LocalPlaylist) -> some View {
+        let iconSize: CGFloat = 24
+        return SidebarRow(title: Text(playlist.name), iconSize: iconSize, isSelected: selection == .localPlaylist(playlist.id), highlight: selectionHighlight) {
+            selection = .localPlaylist(playlist.id)
+        } icon: {
+            PlaylistArtwork(coverURL: playlist.coverURL, playlistID: nil, pixelSize: 64, animated: false)
+                .frame(width: iconSize, height: iconSize)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .contextMenu {
+            Button("播放") {
+                PlayerService.shared.play(tracks: playlist.tracks, source: .none)
+            }
+            Divider()
+            Button("删除歌单", role: .destructive) {
+                if selection == .localPlaylist(playlist.id) { selection = .home }
+                localPlaylists.delete(id: playlist.id)
             }
         }
     }

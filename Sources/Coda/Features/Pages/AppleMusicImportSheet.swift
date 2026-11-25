@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Paste an Apple Music playlist link, pick a signed-in platform, and the
-/// playlist is recreated there as a new playlist named "Apple".
+/// Paste an Apple Music playlist link, pick a preferred platform, and the
+/// playlist is saved as a local playlist named "Apple": each song is looked
+/// up on the preferred platform first, then on the other logged-in platforms,
+/// so one playlist can mix platforms.
 struct AppleMusicImportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var account: AccountStore
@@ -54,7 +56,7 @@ struct AppleMusicImportSheet: View {
 
     private var inputSection: some View {
         VStack(spacing: Theme.Spacing.section) {
-            Text("粘贴 Apple Music 歌单链接，歌单会新建在你选的平台上，名字叫「Apple」")
+            Text("粘贴 Apple Music 歌单链接，每首歌先在优先平台上找，找不到就依次去其他已登录的平台上找，找到的都放进本地歌单「Apple」里，一张歌单、多个平台，不用切换")
                 .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -75,7 +77,7 @@ struct AppleMusicImportSheet: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.Layout.contentInset)
             } else {
-                Picker("导入到", selection: $selectedProvider) {
+                Picker("优先平台", selection: $selectedProvider) {
                     ForEach(providers) { provider in
                         Text(provider.name).tag(Optional(provider))
                     }
@@ -129,7 +131,7 @@ struct AppleMusicImportSheet: View {
     private var doneSection: some View {
         VStack(spacing: Theme.Spacing.section) {
             if let result {
-                Text("已导入 \(result.imported) 首到「Apple」（\(result.provider.name)）")
+                Text("已导入 \(result.imported) 首到本地歌单「Apple」")
                     .font(Theme.Typography.body.weight(.semibold))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.Layout.contentInset)
@@ -138,8 +140,15 @@ struct AppleMusicImportSheet: View {
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
+                if !providerBreakdown(result).isEmpty {
+                    Text(providerBreakdown(result))
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.Layout.contentInset)
+                }
                 if !result.missing.isEmpty {
-                    Text("以下 \(result.missing.count) 首在\(result.provider.name)上没找到：")
+                    Text("以下 \(result.missing.count) 首在已登录的平台上都没找到：")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, Theme.Layout.contentInset)
@@ -156,11 +165,19 @@ struct AppleMusicImportSheet: View {
                     }
                     .frame(maxHeight: 220)
                 }
-                Text("新歌单已出现在你的歌单列表里。")
+                Text("已保存到本地歌单「Apple」，在歌单列表里就能看到。")
                     .font(Theme.Typography.caption)
                     .foregroundStyle(.tertiary)
             }
         }
+    }
+
+    /// "网易云 31 首 · QQ 180 首 · 酷狗 20 首"，只列出有歌的平台。
+    private func providerBreakdown(_ result: AppleMusicPlaylistImporter.Outcome) -> String {
+        MusicProvider.allCases.compactMap { provider in
+            guard let count = result.countsByProvider[provider], count > 0 else { return nil }
+            return "\(provider.name) \(count) 首"
+        }.joined(separator: " · ")
     }
 
     // MARK: - Import
@@ -178,15 +195,14 @@ struct AppleMusicImportSheet: View {
         importTask?.cancel()
         importTask = Task {
             do {
-                let outcome = try await importer.importPlaylist(from: url, to: provider) { done, total in
+                let outcome = try await importer.importPlaylist(from: url, preferredProvider: provider) { done, total in
                     progressDone = done
                     progressTotal = total
                 }
                 try Task.checkCancellation()
                 result = outcome
                 phase = .done
-                await account.refreshLibrary()
-                ToastCenter.shared.show("已导入 \(outcome.imported) 首到「Apple」")
+                ToastCenter.shared.show("已导入 \(outcome.imported) 首到本地歌单「Apple」")
             } catch is CancellationError {
                 phase = .input
             } catch {

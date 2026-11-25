@@ -11,6 +11,7 @@ struct LibraryView: View {
     @State private var showAppleImport = false
     @State private var newPlaylistName = ""
     @StateObject private var profileDetail = PanelResource<NeteaseAPI.UserDetailResponse?>(nil)
+    @StateObject private var localPlaylists = LocalPlaylistStore.shared
 
     var phoneLayout = PhonePageLayout()
     private var isPhone: Bool { phoneLayout.isEnabled }
@@ -146,6 +147,10 @@ struct LibraryView: View {
                 }
                 .padding(.horizontal, 16)
                 playlistShelf(phoneCreatedPlaylists)
+                if !localPlaylists.playlists.isEmpty {
+                    SectionHeader(title: "本地歌单").padding(.horizontal, 16)
+                    localPlaylistShelf(localPlaylists.playlists)
+                }
                 if account.provider.supports(.playlistSubscriptions) || !account.subscribedPlaylists.isEmpty {
                     SectionHeader(title: "收藏的歌单", action: {
                         openDestination(.librarySection(.subscribedPlaylists))
@@ -319,6 +324,14 @@ struct LibraryView: View {
                     }
                 }
 
+                if !localPlaylists.playlists.isEmpty {
+                    Section {
+                        localPlaylistShelf(localPlaylists.playlists)
+                    } header: {
+                        SectionHeader(title: "本地歌单")
+                    }
+                }
+
                 if account.provider.supports(.playlistSubscriptions) || !account.subscribedPlaylists.isEmpty {
                     Section {
                         if account.subscribedPlaylists.isEmpty {
@@ -418,6 +431,24 @@ struct LibraryView: View {
             ForEach(playlists.prefix(visibleCount)) { playlist in
                 NavigationLink(value: Destination.playlist(playlist.id)) {
                     PlaylistCoverCard(playlist: playlist, subtitle: "\(playlist.trackCount) 首")
+                }
+                .buttonStyle(.interactiveCard)
+            }
+        }
+        .padding(.vertical, 8)
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
+    /// Local playlists (imported Apple Music playlists): each can mix
+    /// platforms, so the card shows the first track's cover.
+    private func localPlaylistShelf(_ playlists: [LocalPlaylist]) -> some View {
+        ProfileDetailCoverShelf(itemCount: playlists.count, resetKey: playlists.first?.id) { visibleCount in
+            ForEach(playlists.prefix(visibleCount)) { playlist in
+                NavigationLink(value: Destination.localPlaylist(playlist.id)) {
+                    CoverCardBody(coverURL: playlist.coverURL, title: playlist.name,
+                                  subtitle: "\(playlist.tracks.count) 首")
                 }
                 .buttonStyle(.interactiveCard)
             }

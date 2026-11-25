@@ -20,7 +20,6 @@ enum AppleMusicPlaylistImportError: LocalizedError {
     case noSongs
     case notLoggedIn(MusicProvider)
     case nothingMatched(Int)
-    case createFailed
 
     var errorDescription: String? {
         switch self {
@@ -29,8 +28,7 @@ enum AppleMusicPlaylistImportError: LocalizedError {
         case .playlistNotFound: return "找不到这个 Apple Music 歌单，它可能已下架或设为不公开"
         case .noSongs: return "这个歌单里没有解析到歌曲"
         case .notLoggedIn(let provider): return "请先登录\(provider.name)，再导入歌单"
-        case .nothingMatched(let count): return "歌单里的 \(count) 首歌在该平台上一首都没找到"
-        case .createFailed: return "创建「Apple」歌单失败，请重试"
+        case .nothingMatched(let count): return "歌单里的 \(count) 首歌在已登录的平台上一首都没找到"
         }
     }
 }
@@ -154,47 +152,61 @@ enum AppleMusicPlaylistParser {
     }
 }
 
-/// Imports an Apple Music playlist into one of the signed-in platforms:
-/// parses the shared link, searches each song on that platform with the same
-/// strict matcher the gray-track unlock uses, creates a playlist named
-/// "Apple" and adds every song found. Searching and playlist edits go through
-/// that platform's own saved account (UnblockSessionPool), so the active
-/// account, the current platform and playback are never touched.
+/// Imports an Apple Music playlist across every signed-in platform: parses
+/// the shared link, then searches each song on the preferred platform first
+/// and on the other logged-in platforms after it, with the same strict
+/// matcher the gray-track unlock uses. A server playlist can only hold one
+/// platform's tracks, so the songs found are saved as one local playlist
+/// named "Apple" instead — each song remembers the platform it came from
+/// (Track.platformSong) and playback resolves it through that platform.
+/// Searching goes through each platform's own saved account
+/// (UnblockSessionPool), so the active account, the current platform and
+/// playback are never touched.
 @MainActor
 final class AppleMusicPlaylistImporter: ObservableObject {
     static let playlistName = "Apple"
     private static let searchLimit = 10
-    private static let addBatchSize = 50
 
     struct Outcome {
         let playlistTitle: String
-        let provider: MusicProvider
+        let preferredProvider: MusicProvider
+        /// How many imported songs came from each platform.
+        let countsByProvider: [MusicProvider: Int]
         let imported: Int
         let missing: [AppleMusicPlaylistSong]
     }
 
     private struct MatchedSong {
         let track: Track
-        let providerSong: ProviderSong?
     }
 
     func loggedInProviders() -> [MusicProvider] {
         MusicProvider.allCases.filter { UnblockSessionPool.shared.hasAccount($0) }
     }
 
-    func importPlaylist(from url: URL, to provider: MusicProvider,
+    func importPlaylist(from url: URL, preferredProvider: MusicProvider,
                         onProgress: @escaping @MainActor (Int, Int) -> Void) async throws -> Outcome {
-        guard UnblockSessionPool.shared.hasAccount(provider) else {
-            throw AppleMusicPlaylistImportError.notLoggedIn(provider)
+        guard UnblockSessionPool.shared.hasAccount(preferredProvider) else {
+            throw AppleMusicPlaylistImportError.notLoggedIn(preferredProvider)
         }
         let playlist = try await AppleMusicPlaylistParser.fetch(url: url)
         guard !playlist.songs.isEmpty else { throw AppleMusicPlaylistImportError.noSongs }
+        // Preferred platform first, then every other logged-in platform.
+        // A platform the user has not logged in to is skipped silently.
+        let providers = [preferredProvider] + loggedInProviders().filter { $0 != preferredProvider }
         var matched: [MatchedSong] = []
         var missing: [AppleMusicPlaylistSong] = []
         var seenTrackIDs = Set<Int>()
         for (index, song) in playlist.songs.enumerated() {
             try Task.checkCancellation()
-            if let found = await match(song, on: provider), seenTrackIDs.insert(found.track.id).inserted {
+            var found: MatchedSong?
+            for provider in providers {
+                if let hit = await match(song, on: provider) {
+                    found = hit
+                    break
+                }
+            }
+            if let found, seenTrackIDs.insert(found.track.id).inserted {
                 matched.append(found)
             } else {
                 missing.append(song)
@@ -202,8 +214,11 @@ final class AppleMusicPlaylistImporter: ObservableObject {
             onProgress(index + 1, playlist.songs.count)
         }
         guard !matched.isEmpty else { throw AppleMusicPlaylistImportError.nothingMatched(playlist.songs.count) }
-        try await createPlaylistAndAddTracks(matched, provider: provider)
-        return Outcome(playlistTitle: playlist.title, provider: provider, imported: matched.count, missing: missing)
+        let tracks = matched.map(\.track)
+        let counts = Dictionary(grouping: tracks, by: { $0.platformSong?.source ?? .netease }).mapValues(\.count)
+        LocalPlaylistStore.shared.upsert(name: Self.playlistName, tracks: tracks)
+        return Outcome(playlistTitle: playlist.title, preferredProvider: preferredProvider,
+                       countsByProvider: counts, imported: matched.count, missing: missing)
     }
 
     // MARK: - Matching
@@ -226,7 +241,7 @@ final class AppleMusicPlaylistImporter: ObservableObject {
                                      durationMS: $0.durationMS, payload: $0)
                 }
                 guard let best = pick(query, song: song, candidates: candidates) else { return nil }
-                return MatchedSong(track: best, providerSong: nil)
+                return MatchedSong(track: best)
             case .qq:
                 let songs = try await UnblockSessionPool.shared.qqAPI().searchSongs(keyword: query.keyword, limit: Self.searchLimit)
                 return try await matchProviderSongs(song, query: query, songs: songs)
@@ -252,7 +267,7 @@ final class AppleMusicPlaylistImporter: ObservableObject {
         }
         guard let best = pick(query, song: song, candidates: candidates) else { return nil }
         guard let track = try PlatformMusicAPI.shared.tracks([best]).first else { return nil }
-        return MatchedSong(track: track, providerSong: best)
+        return MatchedSong(track: track)
     }
 
     /// Strict title + artist + duration match first. Only when the Apple page
@@ -272,67 +287,5 @@ final class AppleMusicPlaylistImporter: ObservableObject {
             }
             .filter { abs($0.durationMS - song.durationMS) <= AudioSourceTrackMatcher.maximumDurationDifferenceMS }
             .min { abs($0.durationMS - song.durationMS) < abs($1.durationMS - song.durationMS) }?.payload
-    }
-
-    // MARK: - Playlist creation
-
-    private func createPlaylistAndAddTracks(_ matched: [MatchedSong], provider: MusicProvider) async throws {
-        switch provider {
-        case .netease:
-            let client = UnblockSessionPool.shared.neteaseClient()
-            let data = try await client.eapi("/playlist/create",
-                                             ["name": Self.playlistName, "privacy": 0, "type": "NORMAL"])
-            guard let playlistID = try client.decoded(NeteaseAPI.PlaylistCreateResponse.self, from: data).id else {
-                throw AppleMusicPlaylistImportError.createFailed
-            }
-            for batch in batched(matched.map(\.track.id)) {
-                try await addNeteaseTracks(client: client, playlistID: playlistID, trackIDs: batch)
-            }
-        case .qq:
-            let api = UnblockSessionPool.shared.qqAPI()
-            let item = try await api.createPlaylist(name: Self.playlistName, isPrivate: false)
-            for batch in batched(matched.compactMap(\.providerSong?.id)) {
-                try await api.updatePlaylistTracks(tid: item.id, songIDs: batch, adding: true)
-            }
-        case .kugou:
-            let api = UnblockSessionPool.shared.kugouAPI()
-            let item = try await api.createPlaylist(name: Self.playlistName, isPrivate: false)
-            for batch in batched(matched.compactMap(\.providerSong)) {
-                try await api.addSongs(listID: item.id, songs: batch)
-            }
-        case .qishui:
-            guard let api = UnblockSessionPool.shared.qishuiAPI() else {
-                throw AppleMusicPlaylistImportError.notLoggedIn(provider)
-            }
-            let item = try await api.createPlaylist(name: Self.playlistName, isPrivate: false)
-            for batch in batched(matched.compactMap(\.providerSong?.qishui?.trackID)) {
-                try await api.appendPlaylistTracks(playlistID: item.qishui?.playlistID ?? "", trackIDs: batch)
-            }
-        }
-    }
-
-    /// NetEase `/playlist/manipulate/tracks`, with the same code-512 retry the
-    /// app's own playlist editing uses (already-in-playlist quirk).
-    private func addNeteaseTracks(client: NeteaseClient, playlistID: Int, trackIDs: [Int]) async throws {
-        let ids = "[" + trackIDs.map(String.init).joined(separator: ",") + "]"
-        let data = try await client.eapi("/playlist/manipulate/tracks",
-                                         ["op": "add", "pid": playlistID, "trackIds": ids, "imme": "true"])
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let code = obj["code"] as? Int, code != 200 {
-            if code == 512 {
-                let doubled = "[" + (trackIDs + trackIDs).map(String.init).joined(separator: ",") + "]"
-                _ = try await client.eapi("/playlist/manipulate/tracks",
-                                          ["op": "add", "pid": playlistID, "trackIds": doubled, "imme": "true"])
-                return
-            }
-            throw NeteaseAPIError.business(code: code, message: obj["message"] as? String)
-        }
-    }
-
-    private func batched<T>(_ values: [T]) -> [[T]] {
-        guard !values.isEmpty else { return [] }
-        return stride(from: 0, to: values.count, by: Self.addBatchSize).map {
-            Array(values[$0..<min($0 + Self.addBatchSize, values.count)])
-        }
     }
 }

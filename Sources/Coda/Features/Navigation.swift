@@ -98,6 +98,7 @@ enum SidebarItem: Hashable {
     case collections
     case cloud
     case playlist(Int)
+    case localPlaylist(UUID)
 }
 
 enum Destination: Hashable {
@@ -108,6 +109,7 @@ enum Destination: Hashable {
     case shortcuts
     #endif
     case playlist(Int)
+    case localPlaylist(UUID)
     case radarPlaylist(Int)
     case album(Int)
     case artist(Int)
@@ -217,6 +219,8 @@ struct DestinationsModifier: ViewModifier {
         #endif
         case .playlist(let id):
             PlaylistDetailView(playlistID: id, isLikedList: id == account.likedSongsPlaylist?.id)
+        case .localPlaylist(let id):
+            LocalPlaylistDetailView(playlistID: id)
         case .radarPlaylist(let id):
             PlaylistDetailView(playlistID: id, recommendationContext: .radar)
         case .album(let id):

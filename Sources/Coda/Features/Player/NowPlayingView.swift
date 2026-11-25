@@ -1790,8 +1790,13 @@ struct NowPlayingScrubber: View {
 
     var body: some View {
         // Read the engine clock on the display schedule without publishing
-        // per-frame playback updates to the rest of the player.
-        TimelineView(.animation(paused: !updatesContinuously)) { _ in
+        // per-frame playback updates to the rest of the player. Capped at
+        // 30 fps: on a ProMotion display an uncapped TimelineView re-renders
+        // this subtree 120 times a second — GeometryReader, slider shapes,
+        // two time labels, plus an engine position read per frame — which is
+        // what made playback feel laggy. 30 fps is smooth for a progress bar
+        // and matches the fluid background and the karaoke lines.
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !updatesContinuously)) { _ in
             let duration = isDragging ? dragDuration : player.duration
             let position = isDragging ? dragProgress : player.livePlaybackTime
             let elapsed = position.isFinite ? max(position, 0) : clock.progress
