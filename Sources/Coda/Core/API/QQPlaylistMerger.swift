@@ -9,14 +9,8 @@ import Foundation
 /// playlist are skipped, and a song that appears several times in the local
 /// playlist is only added once. The local playlist itself is not changed.
 enum QQPlaylistMerger {
-    /// What a merge run did. `notFound` lists the local tracks no QQ song
-    /// could be found for, so the user knows exactly what did not make it.
-    struct Outcome {
-        let added: Int
-        let skippedDuplicate: Int
-        let notFound: [Track]
-        let targetName: String
-    }
+    /// What a merge run did; see `PlaylistMergeOutcome`.
+    typealias Outcome = PlaylistMergeOutcome
 
     /// The user's own QQ playlists that can receive songs. Collected lists
     /// belong to someone else, "我的喜欢" is not a real playlist, and radios
@@ -87,26 +81,6 @@ enum QQPlaylistMerger {
                              durationMS: Int($0.duration * 1000), payload: $0.id)
         }
         if let best = AudioSourceTrackMatcher.best(query, in: candidates) { return best }
-        return looseMatch(query, in: candidates)
-    }
-
-    /// Second chance when the strict matcher rejects everything: the title
-    /// and the first artist still have to match exactly, only the duration
-    /// is allowed to drift (pressings of one song often differ by seconds).
-    /// Returns the closest-duration candidate, or nil.
-    private static func looseMatch(_ query: UnblockQuery, in candidates: [UnblockCandidate<Int>]) -> Int? {
-        let wantedTitle = AudioSourceTrackMatcher.normalized(query.title)
-        let wantedStripped = AudioSourceTrackMatcher.normalized(AudioSourceTrackMatcher.stripped(query.title))
-        let primary = query.artists.first.map(AudioSourceTrackMatcher.normalized) ?? ""
-        return candidates
-            .filter { candidate in
-                let title = AudioSourceTrackMatcher.normalized(candidate.title)
-                let stripped = AudioSourceTrackMatcher.normalized(AudioSourceTrackMatcher.stripped(candidate.title))
-                guard title == wantedTitle || stripped == wantedStripped else { return false }
-                guard !primary.isEmpty else { return false }
-                return AudioSourceTrackMatcher.normalized(candidate.artist).contains(primary)
-            }
-            .min { abs($0.durationMS - query.durationMS) < abs($1.durationMS - query.durationMS) }?
-            .payload
+        return PlaylistMergeMatching.looseMatch(query, in: candidates)
     }
 }

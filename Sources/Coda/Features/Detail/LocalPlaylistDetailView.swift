@@ -10,7 +10,7 @@ struct LocalPlaylistDetailView: View {
     @StateObject private var store = LocalPlaylistStore.shared
     private let player = PlayerService.shared
     @State private var confirmDelete = false
-    @State private var showsMergeToQQ = false
+    @State private var showsMerge = false
     @Environment(\.dismiss) private var dismiss
 
     private var playlist: LocalPlaylist? { store.playlist(id: playlistID) }
@@ -49,8 +49,8 @@ struct LocalPlaylistDetailView: View {
                 } message: {
                     Text("只删 App 里的这份本地歌单，各平台上的歌单不受影响。")
                 }
-                .sheet(isPresented: $showsMergeToQQ) {
-                    LocalPlaylistMergeToQQSheet(playlist: playlist)
+                .sheet(isPresented: $showsMerge) {
+                    LocalPlaylistMergeSheet(playlist: playlist)
                 }
             } else {
                 Text("这个本地歌单已经删掉了")
@@ -79,9 +79,9 @@ struct LocalPlaylistDetailView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(playlist.tracks.isEmpty)
                 Button {
-                    showsMergeToQQ = true
+                    showsMerge = true
                 } label: {
-                    Label("合并到 QQ 歌单", systemImage: "arrow.triangle.merge")
+                    Label("合并到平台歌单", systemImage: "arrow.triangle.merge")
                 }
                 .buttonStyle(.bordered)
                 .disabled(playlist.tracks.isEmpty)
