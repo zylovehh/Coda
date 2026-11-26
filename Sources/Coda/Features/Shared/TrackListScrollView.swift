@@ -30,7 +30,9 @@ struct MusicLibraryTrackLayout: DynamicProperty {
     static let dividedColumnSpacing = Theme.Layout.dividedColumnSpacing
     /// Balance the visible duration and rank labels, whose text has unequal side bearings.
     static let columnSeparatorOpticalOffset: CGFloat = 6
-    var background: Color { usesPanel ? Theme.LikedMusic.background(colorScheme) : Platform.windowBackgroundColor }
+    /// Page background: the window already paints the theme background behind
+    /// every page, so a panel must not paint its own opaque color over it.
+    var background: Color { usesPanel ? .clear : Platform.windowBackgroundColor }
 }
 
 /// Shared thin rule for library headers and the text area of song rows.

@@ -6,6 +6,11 @@ enum Theme {
     static var accent: Color { CodaThemeManager.shared.accent }
     static var accentDeep: Color { CodaThemeManager.shared.accentDeep }
 
+    /// 卡片底色，跟着当前主题走（Midnight 自带的卡片色，其他主题用强调色加透明度凑）。
+    static func cardBackground(_ scheme: ColorScheme) -> Color {
+        CodaThemeManager.shared.cardBackground(for: scheme)
+    }
+
     /// Shared translucent surface for the iPad navigation and playback bars.
     static let barMaterial: Material = .regular
 

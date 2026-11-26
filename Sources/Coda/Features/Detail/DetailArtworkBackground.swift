@@ -149,9 +149,9 @@ struct DetailArtworkBackground: ViewModifier {
                         .clipped()
                     }
                     .ignoresSafeArea().accessibilityHidden(true)
-                } else {
-                    Theme.LikedMusic.background(systemScheme)
                 }
+                // No artwork background: paint nothing here — the window's
+                // theme background shows through instead of the old plain color.
             }
             .preference(key: AppPageBackgroundKey.self,
                         value: usesArtworkBackground ? palette.background : nil)

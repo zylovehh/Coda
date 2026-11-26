@@ -104,7 +104,7 @@ private struct PageFormSection: View {
                         }
                     }
                 }
-                .background(Theme.LikedMusic.surface(colorScheme),
+                .background(Theme.cardBackground(colorScheme),
                             in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)

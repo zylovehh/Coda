@@ -282,7 +282,6 @@ private struct StandardHomeView: View {
             homeBody
         }
         .loadingCrossfade(model.loadingModules)
-        .background(Theme.LikedMusic.background(colorScheme))
         .appRootNavigationTitle(String(localized: "推荐"))
         .task(id: likedCoverContext) {
             await loadLikedCovers(context: likedCoverContext)
@@ -694,7 +693,7 @@ struct FeatureCard: View {
             } else if showsDate {
                 Color(white: 0.28)
             } else {
-                Theme.LikedMusic.surface(colorScheme)
+                Theme.cardBackground(colorScheme)
             }
 
             VStack(alignment: .leading, spacing: Theme.Spacing.tight) {
@@ -705,9 +704,9 @@ struct FeatureCard: View {
                 } else if showsIcon {
                     Image(systemName: icon)
                         .font(.system(size: showsCollage ? 15 : 21, weight: .semibold))
-                        .foregroundStyle(usesLightForeground ? Color.white : Theme.LikedMusic.accent(colorScheme))
+                        .foregroundStyle(usesLightForeground ? Color.white : Theme.accent)
                         .frame(width: showsCollage ? 28 : 46, height: showsCollage ? 28 : 46)
-                        .background(usesLightForeground ? Color.white.opacity(0.20) : Theme.LikedMusic.accent(colorScheme).opacity(0.12), in: Circle())
+                        .background(usesLightForeground ? Color.white.opacity(0.20) : Theme.accent.opacity(0.12), in: Circle())
                 }
                 Spacer(minLength: 12)
                 Text(title)

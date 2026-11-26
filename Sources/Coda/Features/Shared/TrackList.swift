@@ -359,7 +359,7 @@ struct TrackRow: View {
     private var songTitle: Text {
         let title = Text(track.name)
             .font(Theme.Typography.trackTitle)
-            .foregroundColor(isCurrent ? (!isCompact && style == .likedMusic ? Theme.LikedMusic.accent(colorScheme) : Theme.accent) : .primary)
+            .foregroundColor(isCurrent ? Theme.accent : .primary)
         guard let subtitle = track.subtitle, !subtitle.isEmpty, !isCompact else { return title }
         // One text run truncates once, after giving the main title its full width.
         return title + Text("  (\(subtitle))")

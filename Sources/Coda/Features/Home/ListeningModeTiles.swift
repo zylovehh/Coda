@@ -18,7 +18,7 @@ struct ListeningModeTile: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.panel)
-        let iconTint = isSelected ? Color.white : Theme.LikedMusic.accent(colorScheme)
+        let iconTint = isSelected ? Color.white : Theme.accent
 
         Button(action: action) {
             Color.clear
@@ -62,15 +62,15 @@ struct ListeningModeTile: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    /// iOS tiles sit on the white page background, so a gray fill separates
-    /// them without a shadow. On macOS, the white tiles keep a light shadow,
-    /// drawn on the shape only so the icon and text don't render offscreen.
+    /// Tiles sit on the theme page background, so the theme card color
+    /// separates them. On macOS the tiles keep a light shadow, drawn on the
+    /// shape only so the icon and text don't render offscreen.
     @ViewBuilder
     private func background(_ shape: RoundedRectangle) -> some View {
         #if os(iOS)
-        shape.fill(isSelected ? Theme.accentDeep : Color(uiColor: .secondarySystemBackground))
+        shape.fill(isSelected ? Theme.accentDeep : Theme.cardBackground(colorScheme))
         #else
-        shape.fill(isSelected ? Theme.accentDeep : Theme.LikedMusic.surface(colorScheme))
+        shape.fill(isSelected ? Theme.accentDeep : Theme.cardBackground(colorScheme))
             .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
         #endif
     }

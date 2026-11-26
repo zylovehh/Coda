@@ -26,7 +26,6 @@ struct QishuiHomeView: View {
             .pageHeaderTopPadding(layout.contentInset)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Theme.LikedMusic.background(colorScheme))
         .appRootNavigationTitle(String(localized: "推荐"))
         #if os(macOS)
         .task {
