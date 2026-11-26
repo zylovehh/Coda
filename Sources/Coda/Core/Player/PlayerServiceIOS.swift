@@ -415,11 +415,9 @@ final class PlayerService: ObservableObject {
     func play(tracks: [Track], source: PlaySource, startAt track: Track? = nil,
               context: PlayContext? = nil) {
         guard !tracks.isEmpty else { return }
-        let provider = MusicProviderContext.shared.current
-        guard tracks.allSatisfy({ ($0.platformSong?.source.rawValue ?? "netease") == provider.rawValue }) else {
-            ToastCenter.shared.show("请先切换到歌曲所属的音乐平台")
-            return
-        }
+        // A mixed playlist queues as-is: each track resolves through its own
+        // platform in startPlaying/resolveAndLoad, so playing never asks the
+        // user to switch platforms first.
         tracks.forEach { PlatformMusicAPI.shared.restore($0) }
         if let context { recordRecent(context) }
         isFMMode = false
@@ -1102,10 +1100,8 @@ final class PlayerService: ObservableObject {
 
     private func startPlaying(_ track: Track,
                               localLease: OfflinePlaybackLease? = nil, resumeAt: TimeInterval = 0) {
-        guard (track.platformSong?.source.rawValue ?? "netease") == MusicProviderContext.shared.current.rawValue else {
-            ToastCenter.shared.show("请先切换到歌曲所属的音乐平台")
-            return
-        }
+        // No platform gate here: a track from another platform resolves
+        // through its own platform in resolveAndLoad.
         fmLoadID = nil
         cancelQishuiFeedLoad()
         qishuiFeedDrained = false
@@ -1162,6 +1158,32 @@ final class PlayerService: ObservableObject {
         trackResolution = (generation, resolution)
         Task {
             await loadLyrics(for: track, generation: generation)
+        }
+    }
+
+    /// The stream address for a track from its own platform (QQ or Kugou),
+    /// used when the current platform cannot serve it — a mixed playlist
+    /// plays each song from where it was found. Returns nil for NetEase
+    /// tracks and for Qishui, which already has its own branch above.
+    private func ownPlatformURLString(for track: Track, quality: String) async -> String? {
+        guard let song = track.platformSong else { return nil }
+        let level = ProviderAudioQuality(rawValue: quality) ?? .hires
+        switch song.source {
+        case .qq:
+            guard let mid = song.qqMid else { return nil }
+            do {
+                return try await QQMusicAPI.shared.songURL(songmid: mid, mediaMid: song.qqMediaMid, quality: level)
+            } catch {
+                return nil
+            }
+        case .kugou:
+            do {
+                return try await KugouMusicAPI.shared.songURL(song: song, quality: level)
+            } catch {
+                return nil
+            }
+        case .qishui, .netease:
+            return nil
         }
     }
 
@@ -1275,9 +1297,15 @@ final class PlayerService: ObservableObject {
             resolvedURL = track.playbackURL(urlString)
         }
 
-        // NetEase refused the request. Try other providers.
+        // NetEase refused the request. The song's own platform goes first: a
+        // mixed playlist plays each song from where it was found; only then
+        // look for the same recording elsewhere.
         if resolvedURL == nil || data?.freeTrialInfo != nil {
-            if await resolveAndLoadUnblocked(track, generation: generation, resumeAt: resumeAt) { return }
+            if let own = await ownPlatformURLString(for: track, quality: quality),
+               let ownURL = track.playbackURL(own) {
+                resolvedURL = ownURL
+                data = nil
+            } else if await resolveAndLoadUnblocked(track, generation: generation, resumeAt: resumeAt) { return }
         }
         guard generation == resolveGeneration else { return }
 

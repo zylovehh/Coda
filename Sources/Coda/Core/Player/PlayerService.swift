@@ -511,11 +511,9 @@ final class PlayerService: ObservableObject {
     func play(tracks: [Track], source: PlaySource, startAt track: Track? = nil,
               context: PlayContext? = nil) {
         guard !tracks.isEmpty else { return }
-        let provider = MusicProviderContext.shared.current
-        guard tracks.allSatisfy({ ($0.platformSong?.source.rawValue ?? "netease") == provider.rawValue }) else {
-            ToastCenter.shared.show("请先切换到歌曲所属的音乐平台")
-            return
-        }
+        // A mixed playlist queues as-is: each track resolves through its own
+        // platform in startPlaying/resolveSource, so playing never asks the
+        // user to switch platforms first.
         tracks.forEach { PlatformMusicAPI.shared.restore($0) }
         if let context { recordRecent(context) }
         isFMMode = false
@@ -1341,10 +1339,8 @@ final class PlayerService: ObservableObject {
 
     private func startPlaying(_ track: Track,
                               localLease: OfflinePlaybackLease? = nil, resumeAt: TimeInterval = 0) {
-        guard (track.platformSong?.source.rawValue ?? "netease") == MusicProviderContext.shared.current.rawValue else {
-            ToastCenter.shared.show("请先切换到歌曲所属的音乐平台")
-            return
-        }
+        // No platform gate here: a track from another platform resolves
+        // through its own platform in resolveSource.
         fmLoadID = nil
         cancelQishuiFeedLoad()
         qishuiFeedDrained = false
