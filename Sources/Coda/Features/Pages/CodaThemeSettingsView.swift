@@ -14,7 +14,7 @@ struct CodaThemeSettingsView: View {
     var body: some View {
         Form {
             Section {
-                themeRow(id: .default, title: "默认", subtitle: "App 现在的样子，不套任何主题",
+                themeRow(id: .default, title: "默认", subtitle: "App 默认样子，深灰渐变底色",
                          bar: LinearGradient(colors: [Color(codaHex: "#EC4949"), Color(codaHex: "#3A3F4A")],
                                              startPoint: .leading, endPoint: .trailing))
                 customRow

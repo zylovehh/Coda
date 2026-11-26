@@ -159,12 +159,25 @@ public final class CodaThemeManager: ObservableObject {
         }
     }
 
-    @AppStorage("coda.theme.id") var themeIDRaw: String = ID.default.rawValue
-    @AppStorage("coda.theme.customColor") var customColorHex: String = "#EC4949"
-    @AppStorage("coda.theme.plainBackground") var plainBackground: Bool = false
-    @AppStorage("coda.theme.colorfulCards") var colorfulCards: Bool = false
+    // @AppStorage 只写 UserDefaults，不会自己发 objectWillChange，观察它的页面
+    // （主题背景、强调色）就收不到刷新通知——换主题后背景一直停在旧样子。
+    // 每个值加 willSet 手动发，换主题立刻全 App 刷新。
+    @AppStorage("coda.theme.id") var themeIDRaw: String = ID.default.rawValue {
+        willSet { objectWillChange.send() }
+    }
+    @AppStorage("coda.theme.customColor") var customColorHex: String = "#EC4949" {
+        willSet { objectWillChange.send() }
+    }
+    @AppStorage("coda.theme.plainBackground") var plainBackground: Bool = false {
+        willSet { objectWillChange.send() }
+    }
+    @AppStorage("coda.theme.colorfulCards") var colorfulCards: Bool = false {
+        willSet { objectWillChange.send() }
+    }
     /// 固定卡片颜色的 hex；空串 = 不固定，按主题色轮着来。
-    @AppStorage("coda.theme.cardColor") var cardColorHex: String = ""
+    @AppStorage("coda.theme.cardColor") var cardColorHex: String = "" {
+        willSet { objectWillChange.send() }
+    }
 
     var themeID: ID {
         get { ID(rawValue: themeIDRaw) ?? .default }
@@ -270,26 +283,25 @@ public final class CodaThemeManager: ObservableObject {
 // MARK: - 主题背景
 
 /// 主题渐变 + 四团光晕（照 WQ 主题页预览的位置摆）。
-/// 默认主题返回 App 原来的主背景色，外面看起来和以前一样。
+/// 四个主题都走同一条路。默认主题以前直接返回系统背景（深色下纯黑），它自己的
+/// #171A21→#101218 渐变色值写了却从来没画出来，用户眼里就是“主题没生效”。
+/// 现在默认主题也画自己的渐变底，不再全黑。
 struct CodaThemeBackgroundView: View {
     @ObservedObject private var theme = CodaThemeManager.shared
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        if theme.themeID == .default {
-            Theme.LikedMusic.background(scheme)
-                .ignoresSafeArea()
-        } else {
-            let variant = theme.colors(for: scheme)
-            GeometryReader { geo in
-                ZStack {
-                    if theme.plainBackground {
-                        (variant.plain ?? variant.backgroundTop)
-                    } else {
-                        LinearGradient(
-                            colors: [variant.backgroundTop, variant.backgroundBottom],
-                            startPoint: .top, endPoint: .bottom)
-                        // 四团光晕：左上、右上、左下、右中。
+        let variant = theme.colors(for: scheme)
+        GeometryReader { geo in
+            ZStack {
+                if theme.plainBackground {
+                    (variant.plain ?? variant.backgroundTop)
+                } else {
+                    LinearGradient(
+                        colors: [variant.backgroundTop, variant.backgroundBottom],
+                        startPoint: .top, endPoint: .bottom)
+                    // 四团光晕：左上、右上、左下、右中。默认主题浅色没有光晕，不画。
+                    if variant.glows.count >= 4 {
                         Circle().fill(variant.glows[0]).frame(width: 300, height: 300).blur(radius: 70)
                             .position(x: -10, y: 10)
                         Circle().fill(variant.glows[1]).frame(width: 300, height: 300).blur(radius: 70)
@@ -301,7 +313,7 @@ struct CodaThemeBackgroundView: View {
                     }
                 }
             }
-            .ignoresSafeArea()
         }
+        .ignoresSafeArea()
     }
 }
