@@ -974,7 +974,12 @@ public struct IOSMainWindow: View {
                 LegacyIPadRoot(path: $iPadPath)
             }
         } else {
+            // iPhone 三个标签页（推荐 / 探索 / 我的）以前没有主题背景：主题背景只画在
+            // MainWindow 里，而 MainWindow 只在 iPad 上用，iPhone 走这里的 tabInterface，
+            // 所以三个页面一直透出系统窗口底色（深色下纯黑），换什么主题都没用。
+            // 在这里垫一层主题背景，换主题立刻跟着变；歌单详情页自带封面背景盖在上面，不受影响。
             tabInterface
+                .background(CodaThemeBackgroundView())
                 .overlay {
                     if settings.showMainWindowAmbientBackground {
                         MainWindowAmbientBackground(

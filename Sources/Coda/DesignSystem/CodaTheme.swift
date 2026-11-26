@@ -96,9 +96,11 @@ enum CodaBuiltinThemes {
     static let midnight = CodaThemeDefinition(
         id: "midnight", name: "Midnight",
         dark: CodaThemeVariant(
-            backgroundTop: Color(codaHex: "#05070F"), backgroundBottom: Color(codaHex: "#0B1226"),
+            // 注意：WQ 原版底色是 #05070F→#0B1226，但那两个值在手机屏上和纯黑没区别，
+            // 用户眼里就是“主题没生效”。这里特意提亮成深海军蓝，渐变+光晕的路子不变。
+            backgroundTop: Color(codaHex: "#1E2A4A"), backgroundBottom: Color(codaHex: "#121C38"),
             glows: [Color(codaHex: "#2F6BFF9E"), Color(codaHex: "#00C2FF66"), Color(codaHex: "#7A5CFF55"), Color(codaHex: "#00E0B03A")],
-            accent: Color(codaHex: "#5AA9FF"), card: Color(codaHex: "#1A2A5C33"), plain: Color(codaHex: "#05070F")),
+            accent: Color(codaHex: "#5AA9FF"), card: Color(codaHex: "#1A2A5C33"), plain: Color(codaHex: "#121C38")),
         light: CodaThemeVariant(
             backgroundTop: Color(codaHex: "#EEF3FF"), backgroundBottom: Color(codaHex: "#DCE6FF"),
             glows: [Color(codaHex: "#7FA8FF80"), Color(codaHex: "#7FE0FF60"), Color(codaHex: "#B9A8FF55"), Color(codaHex: "#7FF0D040")],
