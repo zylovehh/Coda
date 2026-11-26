@@ -21,7 +21,7 @@ enum NeteasePlaylistMerger {
     /// lists belong to someone else and "我喜欢的音乐" is not a real
     /// playlist, so both are left out.
     static func ownedNeteasePlaylists() async throws -> [ProviderPlaylist] {
-        let client = UnblockSessionPool.shared.neteaseClient()
+        let client = await UnblockSessionPool.shared.neteaseClient()
         let uid = try await neteaseUID(using: client)
         let data = try await client.eapi("/user/playlist",
                                          ["uid": uid, "limit": 2000, "offset": 0, "includeVideo": true])
@@ -36,7 +36,7 @@ enum NeteasePlaylistMerger {
     }
 
     static func createNeteasePlaylist(name: String) async throws -> ProviderPlaylist {
-        let client = UnblockSessionPool.shared.neteaseClient()
+        let client = await UnblockSessionPool.shared.neteaseClient()
         _ = try await neteaseUID(using: client)
         let data = try await client.eapi("/playlist/create",
                                          ["name": name, "privacy": 0, "type": "NORMAL"])
@@ -44,8 +44,8 @@ enum NeteasePlaylistMerger {
         guard let id = result.id, id > 0 else {
             throw ProviderRequestError.unknown("网易云没有返回新歌单编号，请刷新歌单列表")
         }
-        AccountStore.shared.invalidateLibrary()
-        return ProviderPlaylist(id: id, name: name, trackCount: 0, source: .netease)
+        await AccountStore.shared.invalidateLibrary()
+        return ProviderPlaylist(id: id, name: name, coverURL: nil, trackCount: 0, source: .netease)
     }
 
     /// Resolves every track to a NetEase song, skips what is already in the
@@ -53,7 +53,7 @@ enum NeteasePlaylistMerger {
     /// `onProgress` reports resolved tracks, so the UI can show "12 / 269".
     static func merge(_ playlist: LocalPlaylist, into target: ProviderPlaylist,
                       onProgress: @escaping @MainActor (Int, Int) -> Void) async throws -> Outcome {
-        let client = UnblockSessionPool.shared.neteaseClient()
+        let client = await UnblockSessionPool.shared.neteaseClient()
         _ = try await neteaseUID(using: client)
         let detailData = try await client.eapi("/v6/playlist/detail",
                                                ["id": target.id, "n": 100_000, "s": 8])
@@ -91,14 +91,14 @@ enum NeteasePlaylistMerger {
             try await addTracks(chunk, to: target.id, using: client)
             offset += chunk.count
         }
-        AccountStore.shared.invalidateLibrary()
+        await AccountStore.shared.invalidateLibrary()
         return Outcome(added: toAdd.count, skippedDuplicate: skipped, notFound: notFound, targetName: target.name)
     }
 
     /// The NetEase user id, from the saved NetEase account when there is
     /// one, otherwise from the logged-in profile behind the cookies.
     private static func neteaseUID(using client: NeteaseClient) async throws -> Int {
-        if let stored = MusicAccountManager.shared.accounts
+        if let stored = await MusicAccountManager.shared.accounts
             .last(where: { $0.provider == .netease && !$0.credentials.isEmpty })?.userID,
            let uid = Int(stored), uid > 0 {
             return uid

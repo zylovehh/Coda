@@ -62,7 +62,7 @@ enum QQPlaylistMerger {
             try await QQMusicAPI.shared.updatePlaylistTracks(tid: target.id, songIDs: chunk, adding: true)
             offset += chunk.count
         }
-        AccountStore.shared.invalidateLibrary()
+        await AccountStore.shared.invalidateLibrary()
         return Outcome(added: toAdd.count, skippedDuplicate: skipped, notFound: notFound, targetName: target.name)
     }
 

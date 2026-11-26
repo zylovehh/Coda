@@ -66,7 +66,7 @@ enum QishuiPlaylistMerger {
             try await QishuiMusicAPI.shared.appendPlaylistTracks(playlistID: reference.playlistID, trackIDs: chunk)
             offset += chunk.count
         }
-        AccountStore.shared.invalidateLibrary()
+        await AccountStore.shared.invalidateLibrary()
         return Outcome(added: toAdd.count, skippedDuplicate: skipped, notFound: notFound, targetName: target.name)
     }
 
@@ -79,7 +79,7 @@ enum QishuiPlaylistMerger {
            let trackID = song.qishui?.trackID, !trackID.isEmpty {
             return trackID
         }
-        guard let api = UnblockSessionPool.shared.qishuiAPI() else { return nil }
+        guard let api = await UnblockSessionPool.shared.qishuiAPI() else { return nil }
         let query = UnblockQuery(track: track)
         guard let page = try? await api.search(keyword: query.keyword, type: .songs, limit: 10, offset: 0),
               !page.songs.isEmpty else { return nil }

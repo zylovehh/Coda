@@ -64,7 +64,7 @@ enum KugouPlaylistMerger {
             try await KugouMusicAPI.shared.addSongs(listID: target.id, songs: chunk)
             offset += chunk.count
         }
-        AccountStore.shared.invalidateLibrary()
+        await AccountStore.shared.invalidateLibrary()
         return Outcome(added: toAdd.count, skippedDuplicate: skipped, notFound: notFound, targetName: target.name)
     }
 
