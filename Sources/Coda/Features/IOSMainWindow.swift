@@ -974,12 +974,10 @@ public struct IOSMainWindow: View {
                 LegacyIPadRoot(path: $iPadPath)
             }
         } else {
-            // iPhone 三个标签页（推荐 / 探索 / 我的）以前没有主题背景：主题背景只画在
-            // MainWindow 里，而 MainWindow 只在 iPad 上用，iPhone 走这里的 tabInterface，
-            // 所以三个页面一直透出系统窗口底色（深色下纯黑），换什么主题都没用。
-            // 在这里垫一层主题背景，换主题立刻跟着变；歌单详情页自带封面背景盖在上面，不受影响。
+            // 0.1.6 曾在这里给 tabInterface 垫主题背景，但没用：TabView 和
+            // NavigationStack 底下是 UIKit 容器，会涂不透明系统底色盖住它。
+            // 主题背景现在画在 tabStack 里、每个标签页的页面上。
             tabInterface
-                .background(CodaThemeBackgroundView())
                 .overlay {
                     if settings.showMainWindowAmbientBackground {
                         MainWindowAmbientBackground(
@@ -1105,7 +1103,14 @@ public struct IOSMainWindow: View {
         @ViewBuilder _ content: () -> Content
     ) -> some View {
         NavigationStack(path: binding(for: tab)) {
-            content().appDestinations()
+            // 主题背景必须画在页面这一层（NavigationStack 里面）：TabView 和
+            // NavigationStack 底下是 UIKit 的容器，自己会涂一层不透明的系统底色
+            // （深色下纯黑），0.1.6 把背景垫在 TabView 外面就被这层盖住了，三页
+            // 一点没变。画在页面上、透明 ScrollView 后面，换主题立刻跟着变。
+            // 歌单详情页自带封面背景画在页面层、在主题背景上面，不受影响。
+            content()
+                .background(CodaThemeBackgroundView())
+                .appDestinations()
         }
     }
 

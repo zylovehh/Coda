@@ -14,7 +14,7 @@ PRODUCT_BUNDLE_IDENTIFIER = $(CODA_BUNDLE_IDENTIFIER)
 // name comes from CFBundleDisplayName.
 INFOPLIST_KEY_CFBundleDisplayName = $(CODA_APP_NAME)
 // CodaReleaseRepository and CodaDeveloperName are declared in Config/Info.plist.
-MARKETING_VERSION = 0.1.6
+MARKETING_VERSION = 0.1.7
 CURRENT_PROJECT_VERSION = 1
 DEVELOPMENT_TEAM =
 CODE_SIGN_STYLE = Automatic
