@@ -79,6 +79,9 @@ struct PlaylistDetailHero<Actions: View>: View {
     let metadataText: String
     var circularArtwork = false
     var showsAvatar = true
+    /// The "我的" page hides the big profile picture; playlist and artist
+    /// pages keep it.
+    var showsArtwork = true
     var isLoading = false
     @ViewBuilder var actions: () -> Actions
 
@@ -92,7 +95,8 @@ struct PlaylistDetailHero<Actions: View>: View {
             IPadDetailHeader(artworkURL: artworkURL, title: title,
                                  subtitle: subtitle, avatarURL: avatarURL,
                                  metadataText: metadataText, circularArtwork: circularArtwork,
-                                 showsAvatar: showsAvatar, isLoading: isLoading, actions: actions)
+                                 showsAvatar: showsAvatar, showsArtwork: showsArtwork,
+                                 isLoading: isLoading, actions: actions)
         } else {
             phoneHero
         }
@@ -100,9 +104,11 @@ struct PlaylistDetailHero<Actions: View>: View {
 
     private var phoneHero: some View {
         VStack(spacing: 0) {
-            artwork
-                .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
-                .accessibilityHidden(true)
+            if showsArtwork {
+                artwork
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
+                    .accessibilityHidden(true)
+            }
 
             Group {
                 if isLoading {
@@ -116,7 +122,7 @@ struct PlaylistDetailHero<Actions: View>: View {
                         .accessibilityAddTraits(.isHeader)
                 }
             }
-            .padding(.top, Theme.Spacing.page)
+            .padding(.top, showsArtwork ? Theme.Spacing.page : 0)
             .padding(.horizontal, phoneLayout.contentInset)
 
             HStack(spacing: Theme.Spacing.small) {
@@ -165,7 +171,7 @@ struct PlaylistDetailHero<Actions: View>: View {
                 .padding(.top, Theme.Spacing.component)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, Theme.Spacing.section)
+        .padding(.top, showsArtwork ? Theme.Spacing.section : Theme.Spacing.small)
         .padding(.bottom, Theme.Spacing.section)
         .background {
             GeometryReader { geometry in
@@ -202,6 +208,7 @@ private struct IPadDetailHeader<Actions: View>: View {
     let metadataText: String
     var circularArtwork = false
     var showsAvatar = true
+    var showsArtwork = true
     var searchText: Binding<String>? = nil
     var searchFocused: Binding<Bool>? = nil
     var searchPlaceholder: String = String(localized: "在歌单中搜索")
@@ -210,7 +217,8 @@ private struct IPadDetailHeader<Actions: View>: View {
 
     var body: some View {
         MusicLibraryHeaderLayout(title: title, icon: nil, coverURL: artworkURL,
-                                 circularCover: circularArtwork, isLoading: isLoading, usesPlaylistActions: true,
+                                 circularCover: circularArtwork, showsCover: showsArtwork,
+                                 isLoading: isLoading, usesPlaylistActions: true,
                                  searchText: searchText, searchFocused: searchFocused,
                                  searchPlaceholder: searchPlaceholder) {
             EmptyView()

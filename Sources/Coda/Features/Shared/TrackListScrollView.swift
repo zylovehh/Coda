@@ -274,6 +274,9 @@ struct MusicLibraryHeaderLayout<Eyebrow: View, Metadata: View, Actions: View>: V
     let coverURL: String?
     var description: String? = nil
     var circularCover = false
+    /// The "我的" page hides the big profile picture; playlist, collection
+    /// and artist pages keep their cover.
+    var showsCover = true
     var isLoading = false
     var actionColumns: Int? = nil
     var usesPlaylistActions = false
@@ -318,7 +321,7 @@ struct MusicLibraryHeaderLayout<Eyebrow: View, Metadata: View, Actions: View>: V
             }
             if hasPlaylistActions {
                 playlistHeader
-            } else {
+            } else if showsCover {
                 HStack(alignment: .top, spacing: Theme.Spacing.group) {
                     artwork
                     VStack(alignment: .leading, spacing: Theme.Spacing.small) {
@@ -331,6 +334,19 @@ struct MusicLibraryHeaderLayout<Eyebrow: View, Metadata: View, Actions: View>: V
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: isNarrow ? nil : artworkSize, alignment: .top)
                 }
+                if isNarrow {
+                    descriptionButton
+                    controls
+                }
+            } else {
+                VStack(alignment: .leading, spacing: Theme.Spacing.small) {
+                    information
+                    if !isNarrow {
+                        Spacer(minLength: 8)
+                        controls
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 if isNarrow {
                     descriptionButton
                     controls
@@ -354,7 +370,12 @@ struct MusicLibraryHeaderLayout<Eyebrow: View, Metadata: View, Actions: View>: V
 
     @ViewBuilder
     private var playlistHeader: some View {
-        if availableWidth >= 480 {
+        if !showsCover {
+            VStack(alignment: .leading, spacing: Theme.Spacing.component) {
+                information
+                controls
+            }
+        } else if availableWidth >= 480 {
             HStack(alignment: .bottom, spacing: Theme.Spacing.group) {
                 artwork
                 VStack(alignment: .leading, spacing: Theme.Spacing.component) {
